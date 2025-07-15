@@ -1,4 +1,3 @@
-"use client";
 import React, { useState } from "react";
 import {
   Plane,
@@ -522,10 +521,19 @@ export default function AeroNoteLanding() {
                       About
                     </a>
                   </li>
-
+                  <li>
+                    <a href="#" className="hover:text-white transition-colors">
+                      Careers
+                    </a>
+                  </li>
                   <li>
                     <a href="#" className="hover:text-white transition-colors">
                       Contact
+                    </a>
+                  </li>
+                  <li>
+                    <a href="#" className="hover:text-white transition-colors">
+                      Partners
                     </a>
                   </li>
                 </ul>

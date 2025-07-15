@@ -20,11 +20,29 @@ export default function LogUpload({ aircraftId, onUploadComplete }) {
     setProgress(0)
 
     try {
-      for (const file of acceptedFiles) {
-        setStatus(`Processing ${file.name}...`)
-        setProgress(25)
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) throw new Error('User not authenticated')
 
-        // Read file content
+      for (const file of acceptedFiles) {
+        setStatus(`Uploading ${file.name}...`)
+        setProgress(10)
+
+        // Generate unique file path
+        const fileExt = file.name.split('.').pop()
+        const fileName = `${user.id}/${Date.now()}-${Math.random().toString(36).substring(2)}.${fileExt}`
+        
+        // Upload file to Supabase storage
+        const { data: uploadData, error: uploadError } = await supabase.storage
+          .from('flight-logs')
+          .upload(fileName, file, {
+            cacheControl: '3600',
+            upsert: false
+          })
+
+        if (uploadError) throw uploadError
+        setProgress(30)
+
+        // Read file content for processing
         const fileContent = await file.text()
         setProgress(50)
 
@@ -32,11 +50,12 @@ export default function LogUpload({ aircraftId, onUploadComplete }) {
         const source = detectLogSource(file.name, fileContent)
         
         // Create flight record first
+        setStatus(`Creating flight record...`)
         const { data: flight, error: flightError } = await supabase
           .from('flights')
           .insert({
             aircraft_id: aircraftId,
-            pilot_id: (await supabase.auth.getUser()).data.user.id,
+            pilot_id: user.id,
             flight_number: `IMPORT_${Date.now()}`,
             start_time: new Date().toISOString(),
             compliance_status: 'processing'
@@ -45,40 +64,53 @@ export default function LogUpload({ aircraftId, onUploadComplete }) {
           .single()
 
         if (flightError) throw flightError
-        setProgress(75)
+        setProgress(60)
 
-        // Store raw log data
+        // Store flight log metadata with storage path
         const { error: logError } = await supabase
           .from('flight_logs')
           .insert({
             flight_id: flight.id,
             import_source: source,
-            raw_data: { content: fileContent },
+            raw_data: { 
+              storage_path: uploadData.path,
+              file_url: `${supabase.storage.from('flight-logs').getPublicUrl(uploadData.path).data.publicUrl}`
+            },
             file_name: file.name,
             file_size: file.size,
             import_status: 'uploaded'
           })
 
         if (logError) throw logError
+        setProgress(75)
 
         // Call edge function to parse the log
+        setStatus(`Parsing flight data...`)
         const { error: parseError } = await supabase.functions.invoke('parse-flight-log', {
           body: {
-            logData: fileContent,
+            storagePath: uploadData.path,
             source,
             flightId: flight.id
           }
         })
 
-        if (parseError) throw parseError
-        setProgress(100)
+        if (parseError) {
+          console.warn('Parse error:', parseError)
+          // Don't throw here - we still have the file uploaded
+          setStatus(`Upload complete - parsing failed: ${parseError.message}`)
+        } else {
+          setStatus(`Successfully imported ${file.name}`)
+        }
         
-        setStatus(`Successfully imported ${file.name}`)
+        setProgress(100)
         onUploadComplete?.(flight.id)
       }
     } catch (err) {
       setError(err.message)
       setStatus('')
+      
+      // Cleanup on error - try to delete uploaded file if it exists
+      // This is best effort, don't throw if cleanup fails
     } finally {
       setUploading(false)
       setTimeout(() => {

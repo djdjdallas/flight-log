@@ -18,9 +18,11 @@ CREATE TABLE user_profiles (
     email VARCHAR(255) NOT NULL,
     full_name VARCHAR(255),
     pilot_certificate_number VARCHAR(50),
+    pilot_certificate_expiry DATE,
     organization_id UUID REFERENCES organizations(id),
     role VARCHAR(50) DEFAULT 'pilot',
     phone VARCHAR(20),
+    onboarding_completed BOOLEAN DEFAULT false,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
@@ -31,10 +33,12 @@ CREATE TABLE aircraft (
     user_id UUID REFERENCES auth.users(id) NOT NULL,
     organization_id UUID REFERENCES organizations(id),
     registration_number VARCHAR(20) NOT NULL,
+    registration_expiry DATE,
     manufacturer VARCHAR(100) NOT NULL,
     model VARCHAR(100) NOT NULL,
     serial_number VARCHAR(100),
     remote_id_serial VARCHAR(100),
+    remote_id_type VARCHAR(50) DEFAULT 'standard', -- 'standard', 'broadcast', 'network'
     weight_lbs DECIMAL(5,2),
     purchase_date DATE,
     status VARCHAR(20) DEFAULT 'active',
@@ -128,6 +132,50 @@ CREATE TABLE airspace_authorizations (
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
+-- Compliance checks
+CREATE TABLE compliance_checks (
+    id UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
+    flight_id UUID REFERENCES flights(id),
+    aircraft_id UUID REFERENCES aircraft(id),
+    user_id UUID REFERENCES auth.users(id) NOT NULL,
+    check_type VARCHAR(50) NOT NULL, -- 'remote_id', 'registration', 'part107', 'weight', 'airspace'
+    status VARCHAR(20) NOT NULL, -- 'pass', 'fail', 'warning'
+    details JSONB,
+    violation_message TEXT,
+    checked_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- Notifications
+CREATE TABLE notifications (
+    id UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
+    user_id UUID REFERENCES auth.users(id) NOT NULL,
+    title VARCHAR(255) NOT NULL,
+    message TEXT NOT NULL,
+    type VARCHAR(50) NOT NULL, -- 'compliance', 'expiry', 'violation', 'info'
+    severity VARCHAR(20) DEFAULT 'info', -- 'info', 'warning', 'error'
+    data JSONB,
+    read_at TIMESTAMP WITH TIME ZONE,
+    dismissed_at TIMESTAMP WITH TIME ZONE,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- User settings
+CREATE TABLE user_settings (
+    id UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
+    user_id UUID REFERENCES auth.users(id) NOT NULL,
+    notification_email BOOLEAN DEFAULT true,
+    notification_push BOOLEAN DEFAULT true,
+    compliance_alerts BOOLEAN DEFAULT true,
+    expiry_reminders BOOLEAN DEFAULT true,
+    weekly_summary BOOLEAN DEFAULT true,
+    reminder_days_registration INTEGER DEFAULT 30,
+    reminder_days_part107 INTEGER DEFAULT 60,
+    timezone VARCHAR(50) DEFAULT 'UTC',
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
 -- RLS Policies
 ALTER TABLE user_profiles ENABLE ROW LEVEL SECURITY;
 ALTER TABLE organizations ENABLE ROW LEVEL SECURITY;
@@ -137,6 +185,9 @@ ALTER TABLE flights ENABLE ROW LEVEL SECURITY;
 ALTER TABLE flight_logs ENABLE ROW LEVEL SECURITY;
 ALTER TABLE compliance_reports ENABLE ROW LEVEL SECURITY;
 ALTER TABLE airspace_authorizations ENABLE ROW LEVEL SECURITY;
+ALTER TABLE compliance_checks ENABLE ROW LEVEL SECURITY;
+ALTER TABLE notifications ENABLE ROW LEVEL SECURITY;
+ALTER TABLE user_settings ENABLE ROW LEVEL SECURITY;
 
 -- User can only access their own data
 CREATE POLICY "Users can access own profile" ON user_profiles 
@@ -172,6 +223,15 @@ CREATE POLICY "Users can access own airspace authorizations" ON airspace_authori
         AND flights.pilot_id = auth.uid()
     ));
 
+CREATE POLICY "Users can access own compliance checks" ON compliance_checks 
+    FOR ALL USING (auth.uid() = user_id);
+
+CREATE POLICY "Users can access own notifications" ON notifications 
+    FOR ALL USING (auth.uid() = user_id);
+
+CREATE POLICY "Users can access own settings" ON user_settings 
+    FOR ALL USING (auth.uid() = user_id);
+
 -- Organization members can access shared data
 CREATE POLICY "Organization members can access organization data" ON organizations
     FOR SELECT USING (EXISTS (
@@ -203,3 +263,56 @@ CREATE TRIGGER update_batteries_updated_at BEFORE UPDATE ON batteries
 
 CREATE TRIGGER update_flights_updated_at BEFORE UPDATE ON flights
     FOR EACH ROW EXECUTE FUNCTION update_updated_at();
+
+CREATE TRIGGER update_user_settings_updated_at BEFORE UPDATE ON user_settings
+    FOR EACH ROW EXECUTE FUNCTION update_updated_at();
+
+-- Compliance checking functions
+CREATE OR REPLACE FUNCTION check_remote_id_requirement(aircraft_weight_lbs DECIMAL)
+RETURNS BOOLEAN AS $$
+BEGIN
+    -- Remote ID required for aircraft over 0.55 lbs (250g)
+    RETURN aircraft_weight_lbs > 0.55;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE OR REPLACE FUNCTION get_registration_expiry_days(registration_expiry DATE)
+RETURNS INTEGER AS $$
+BEGIN
+    RETURN EXTRACT(DAYS FROM registration_expiry - CURRENT_DATE);
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE OR REPLACE FUNCTION get_part107_expiry_days(cert_expiry DATE)
+RETURNS INTEGER AS $$
+BEGIN
+    RETURN EXTRACT(DAYS FROM cert_expiry - CURRENT_DATE);
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE OR REPLACE FUNCTION calculate_compliance_score(user_uuid UUID)
+RETURNS DECIMAL AS $$
+DECLARE
+    total_flights INTEGER;
+    compliant_flights INTEGER;
+    score DECIMAL;
+BEGIN
+    -- Get total flights for user
+    SELECT COUNT(*) INTO total_flights
+    FROM flights
+    WHERE pilot_id = user_uuid;
+    
+    -- Get compliant flights
+    SELECT COUNT(*) INTO compliant_flights
+    FROM flights
+    WHERE pilot_id = user_uuid AND compliance_status = 'compliant';
+    
+    -- Calculate score
+    IF total_flights = 0 THEN
+        RETURN 100;
+    END IF;
+    
+    score := (compliant_flights::DECIMAL / total_flights::DECIMAL) * 100;
+    RETURN ROUND(score, 2);
+END;
+$$ LANGUAGE plpgsql;
