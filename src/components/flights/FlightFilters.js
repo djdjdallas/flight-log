@@ -18,9 +18,9 @@ export default function FlightFilters({ onFiltersChange, onExport }) {
   const [filters, setFilters] = useState({
     dateFrom: '',
     dateTo: '',
-    aircraftId: '',
-    complianceStatus: '',
-    remoteIdVerified: ''
+    aircraftId: 'all',
+    complianceStatus: 'all',
+    remoteIdVerified: 'all'
   })
   const [aircraft, setAircraft] = useState([])
   const [isExpanded, setIsExpanded] = useState(false)
@@ -31,7 +31,7 @@ export default function FlightFilters({ onFiltersChange, onExport }) {
 
   useEffect(() => {
     onFiltersChange?.(filters)
-  }, [filters, onFiltersChange])
+  }, [filters]) // Remove onFiltersChange from dependencies to prevent infinite loop
 
   async function fetchAircraft() {
     try {
@@ -62,13 +62,14 @@ export default function FlightFilters({ onFiltersChange, onExport }) {
     setFilters({
       dateFrom: '',
       dateTo: '',
-      aircraftId: '',
-      complianceStatus: '',
-      remoteIdVerified: ''
+      aircraftId: 'all',
+      complianceStatus: 'all',
+      remoteIdVerified: 'all'
     })
   }
 
-  const hasActiveFilters = Object.values(filters).some(value => value !== '')
+  const hasActiveFilters = filters.dateFrom !== '' || filters.dateTo !== '' || 
+    filters.aircraftId !== 'all' || filters.complianceStatus !== 'all' || filters.remoteIdVerified !== 'all'
 
   const getDatePreset = (preset) => {
     const now = new Date()
@@ -222,7 +223,7 @@ export default function FlightFilters({ onFiltersChange, onExport }) {
                   <SelectValue placeholder="All aircraft" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">All aircraft</SelectItem>
+                  <SelectItem value="all">All aircraft</SelectItem>
                   {aircraft.map((aircraft) => (
                     <SelectItem key={aircraft.id} value={aircraft.id}>
                       {aircraft.manufacturer} {aircraft.model} ({aircraft.registration_number})
@@ -242,7 +243,7 @@ export default function FlightFilters({ onFiltersChange, onExport }) {
                   <SelectValue placeholder="All statuses" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">All statuses</SelectItem>
+                  <SelectItem value="all">All statuses</SelectItem>
                   <SelectItem value="compliant">Compliant</SelectItem>
                   <SelectItem value="non_compliant">Non-Compliant</SelectItem>
                   <SelectItem value="pending">Pending Review</SelectItem>
@@ -261,7 +262,7 @@ export default function FlightFilters({ onFiltersChange, onExport }) {
                   <SelectValue placeholder="All flights" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">All flights</SelectItem>
+                  <SelectItem value="all">All flights</SelectItem>
                   <SelectItem value="true">Verified</SelectItem>
                   <SelectItem value="false">Not Verified</SelectItem>
                 </SelectContent>

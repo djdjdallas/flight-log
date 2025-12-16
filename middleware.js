@@ -8,6 +8,8 @@ export async function middleware(req) {
   const {
     data: { session },
   } = await supabase.auth.getSession()
+  
+  console.log(`Middleware: ${req.nextUrl.pathname}, Session exists: ${!!session}`)
 
   // Protected routes that require authentication
   const protectedPaths = ['/dashboard', '/onboarding']

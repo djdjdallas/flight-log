@@ -66,7 +66,8 @@ export default function SignupForm() {
       if (authData.user && !authData.session) {
         setMessage('Please check your email for verification link before signing in.')
       } else {
-        router.push('/dashboard')
+        // New users always need to go through onboarding
+        window.location.href = '/onboarding/profile'
       }
 
     } catch (err) {

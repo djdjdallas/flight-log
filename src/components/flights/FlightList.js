@@ -10,6 +10,12 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog'
 import { 
   MapPin, 
   Calendar, 
@@ -21,14 +27,20 @@ import {
   Plane,
   AlertTriangle,
   CheckCircle,
-  FileText
+  FileText,
+  Upload,
+  PenTool
 } from 'lucide-react'
 import Link from 'next/link'
+import FlightForm from './FlightForm'
+import LogUpload from './LogUpload'
 
-export default function FlightList({ filters = {} }) {
+export default function FlightList({ filters = {}, onFlightAdded }) {
   const [flights, setFlights] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
+  const [dialogOpen, setDialogOpen] = useState(false)
+  const [dialogType, setDialogType] = useState('') // 'manual' or 'upload'
 
   useEffect(() => {
     fetchFlights()
@@ -77,11 +89,14 @@ export default function FlightList({ filters = {} }) {
       if (filters.dateTo) {
         query = query.lte('start_time', filters.dateTo)
       }
-      if (filters.aircraftId) {
+      if (filters.aircraftId && filters.aircraftId !== 'all') {
         query = query.eq('aircraft_id', filters.aircraftId)
       }
-      if (filters.complianceStatus) {
+      if (filters.complianceStatus && filters.complianceStatus !== 'all') {
         query = query.eq('compliance_status', filters.complianceStatus)
+      }
+      if (filters.remoteIdVerified && filters.remoteIdVerified !== 'all') {
+        query = query.eq('remote_id_verified', filters.remoteIdVerified === 'true')
       }
 
       const { data, error } = await query
@@ -111,6 +126,18 @@ export default function FlightList({ filters = {} }) {
       console.error('Error deleting flight:', error)
       alert('Failed to delete flight')
     }
+  }
+
+  const handleSuccess = () => {
+    setDialogOpen(false)
+    setDialogType('')
+    onFlightAdded?.()
+    fetchFlights() // Refresh the list
+  }
+
+  const openDialog = (type) => {
+    setDialogType(type)
+    setDialogOpen(true)
   }
 
   const getComplianceBadge = (status, remoteIdVerified) => {
@@ -194,27 +221,51 @@ export default function FlightList({ filters = {} }) {
 
   if (flights.length === 0) {
     return (
-      <Card>
-        <CardContent className="text-center py-16">
-          <Plane className="h-16 w-16 mx-auto mb-4 text-gray-400" />
-          <h3 className="text-lg font-medium text-gray-900 mb-2">No Flights Found</h3>
-          <p className="text-gray-600 mb-6">
-            {Object.keys(filters).length > 0 
-              ? 'No flights match your current filters. Try adjusting your search criteria.'
-              : 'Get started by logging your first flight or uploading flight data.'
-            }
-          </p>
-          <div className="flex justify-center space-x-4">
-            <Button>
-              <FileText className="h-4 w-4 mr-2" />
-              Upload Flight Log
-            </Button>
-            <Button variant="outline">
-              Manual Entry
-            </Button>
-          </div>
-        </CardContent>
-      </Card>
+      <>
+        <Card>
+          <CardContent className="text-center py-16">
+            <Plane className="h-16 w-16 mx-auto mb-4 text-gray-400" />
+            <h3 className="text-lg font-medium text-gray-900 mb-2">No Flights Found</h3>
+            <p className="text-gray-600 mb-6">
+              {Object.keys(filters).length > 0 
+                ? 'No flights match your current filters. Try adjusting your search criteria.'
+                : 'Get started by logging your first flight or uploading flight data.'
+              }
+            </p>
+            <div className="flex justify-center space-x-4">
+              <Button onClick={() => openDialog('upload')}>
+                <Upload className="h-4 w-4 mr-2" />
+                Upload Flight Log
+              </Button>
+              <Button variant="outline" onClick={() => openDialog('manual')}>
+                <PenTool className="h-4 w-4 mr-2" />
+                Manual Entry
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+          <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle>
+                {dialogType === 'upload' ? 'Upload Flight Log' : 'Add Flight Manually'}
+              </DialogTitle>
+            </DialogHeader>
+            
+            {dialogType === 'upload' ? (
+              <div className="space-y-6">
+                <LogUpload onUploadComplete={handleSuccess} />
+              </div>
+            ) : dialogType === 'manual' ? (
+              <FlightForm 
+                onSuccess={handleSuccess} 
+                onCancel={() => setDialogOpen(false)} 
+              />
+            ) : null}
+          </DialogContent>
+        </Dialog>
+      </>
     )
   }
 

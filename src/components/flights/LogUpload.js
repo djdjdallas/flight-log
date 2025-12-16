@@ -1,11 +1,19 @@
 'use client'
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useEffect } from 'react'
 import { useDropzone } from 'react-dropzone'
 import { supabase } from '@/lib/supabase/client'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Progress } from '@/components/ui/progress'
 import { Alert, AlertDescription } from '@/components/ui/alert'
+import { Label } from '@/components/ui/label'
+import { 
+  Select, 
+  SelectContent, 
+  SelectItem, 
+  SelectTrigger, 
+  SelectValue 
+} from '@/components/ui/select'
 import { Upload, FileText, CheckCircle, AlertCircle } from 'lucide-react'
 
 export default function LogUpload({ aircraftId, onUploadComplete }) {
@@ -13,8 +21,38 @@ export default function LogUpload({ aircraftId, onUploadComplete }) {
   const [progress, setProgress] = useState(0)
   const [status, setStatus] = useState('')
   const [error, setError] = useState('')
+  const [selectedAircraftId, setSelectedAircraftId] = useState(aircraftId || '')
+  const [aircraft, setAircraft] = useState([])
+
+  useEffect(() => {
+    fetchAircraft()
+  }, [])
+
+  async function fetchAircraft() {
+    try {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) return
+
+      const { data } = await supabase
+        .from('aircraft')
+        .select('id, registration_number, manufacturer, model')
+        .eq('user_id', user.id)
+        .eq('status', 'active')
+        .order('manufacturer')
+
+      setAircraft(data || [])
+    } catch (error) {
+      console.error('Error fetching aircraft:', error)
+    }
+  }
 
   const onDrop = useCallback(async (acceptedFiles) => {
+    // Validate aircraft selection before starting upload
+    if (!selectedAircraftId) {
+      setError('Please select an aircraft before uploading flight logs')
+      return
+    }
+
     setUploading(true)
     setError('')
     setProgress(0)
@@ -49,21 +87,47 @@ export default function LogUpload({ aircraftId, onUploadComplete }) {
         // Determine source based on file format
         const source = detectLogSource(file.name, fileContent)
         
+        // Verify aircraft ownership before creating flight
+        setStatus(`Verifying aircraft access...`)
+        const { data: aircraftCheck, error: aircraftError } = await supabase
+          .from('aircraft')
+          .select('id, user_id')
+          .eq('id', selectedAircraftId)
+          .eq('user_id', user.id)
+          .single()
+
+        if (aircraftError || !aircraftCheck) {
+          console.error('Aircraft verification error:', aircraftError)
+          throw new Error('Selected aircraft not found or access denied')
+        }
+
+        console.log('User ID:', user.id)
+        console.log('Aircraft ID:', selectedAircraftId)
+        console.log('Aircraft Owner:', aircraftCheck.user_id)
+
         // Create flight record first
         setStatus(`Creating flight record...`)
+        const flightData = {
+          aircraft_id: selectedAircraftId,
+          pilot_id: user.id,
+          flight_number: `IMPORT_${Date.now()}`,
+          start_time: new Date().toISOString(),
+          compliance_status: 'processing'
+        }
+        
+        console.log('Inserting flight data:', flightData)
+        
         const { data: flight, error: flightError } = await supabase
           .from('flights')
-          .insert({
-            aircraft_id: aircraftId,
-            pilot_id: user.id,
-            flight_number: `IMPORT_${Date.now()}`,
-            start_time: new Date().toISOString(),
-            compliance_status: 'processing'
-          })
+          .insert(flightData)
           .select()
           .single()
 
-        if (flightError) throw flightError
+        if (flightError) {
+          console.error('Flight insert error:', flightError)
+          console.error('Error details:', JSON.stringify(flightError, null, 2))
+          throw new Error(`Failed to create flight record: ${flightError.message}`)
+        }
         setProgress(60)
 
         // Store flight log metadata with storage path
@@ -81,7 +145,10 @@ export default function LogUpload({ aircraftId, onUploadComplete }) {
             import_status: 'uploaded'
           })
 
-        if (logError) throw logError
+        if (logError) {
+          console.error('Flight log insert error:', logError)
+          throw new Error(`Failed to create flight log record: ${logError.message}`)
+        }
         setProgress(75)
 
         // Call edge function to parse the log
@@ -118,7 +185,7 @@ export default function LogUpload({ aircraftId, onUploadComplete }) {
         setStatus('')
       }, 3000)
     }
-  }, [aircraftId, onUploadComplete])
+  }, [selectedAircraftId, onUploadComplete])
 
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
     onDrop,
@@ -128,7 +195,7 @@ export default function LogUpload({ aircraftId, onUploadComplete }) {
       'application/json': ['.json']
     },
     multiple: true,
-    disabled: uploading
+    disabled: uploading || !selectedAircraftId
   })
 
   function detectLogSource(fileName, content) {
@@ -146,6 +213,29 @@ export default function LogUpload({ aircraftId, onUploadComplete }) {
         </CardTitle>
       </CardHeader>
       <CardContent>
+        {/* Aircraft Selection */}
+        <div className="mb-6">
+          <Label htmlFor="aircraft">Aircraft *</Label>
+          <Select 
+            value={selectedAircraftId} 
+            onValueChange={setSelectedAircraftId}
+          >
+            <SelectTrigger>
+              <SelectValue placeholder="Select aircraft" />
+            </SelectTrigger>
+            <SelectContent>
+              {aircraft.map((aircraft) => (
+                <SelectItem key={aircraft.id} value={aircraft.id}>
+                  {aircraft.manufacturer} {aircraft.model} ({aircraft.registration_number})
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <p className="text-sm text-muted-foreground mt-1">
+            Select the aircraft that generated this flight log
+          </p>
+        </div>
+
         <div
           {...getRootProps()}
           className={`border-2 border-dashed rounded-lg p-8 text-center cursor-pointer transition-colors
@@ -153,7 +243,7 @@ export default function LogUpload({ aircraftId, onUploadComplete }) {
               ? 'border-primary bg-primary/5' 
               : 'border-gray-300 hover:border-primary/50'
             }
-            ${uploading ? 'cursor-not-allowed opacity-50' : ''}
+            ${uploading || !selectedAircraftId ? 'cursor-not-allowed opacity-50' : ''}
           `}
         >
           <input {...getInputProps()} />
@@ -173,7 +263,12 @@ export default function LogUpload({ aircraftId, onUploadComplete }) {
               <FileText className="h-12 w-12 mx-auto text-muted-foreground" />
               <div>
                 <p className="text-lg font-medium">
-                  {isDragActive ? 'Drop files here' : 'Drop flight logs here, or click to browse'}
+                  {!selectedAircraftId 
+                    ? 'Select an aircraft above to upload flight logs'
+                    : isDragActive 
+                    ? 'Drop files here' 
+                    : 'Drop flight logs here, or click to browse'
+                  }
                 </p>
                 <p className="text-sm text-muted-foreground">
                   Supports DJI (.txt, .csv) and Autel (.json) flight logs

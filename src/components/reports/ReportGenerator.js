@@ -21,7 +21,7 @@ export default function ReportGenerator() {
     reportType: 'audit',
     dateFrom: '',
     dateTo: '',
-    aircraftId: '',
+    aircraftId: 'all',
     includeNonCompliant: true,
     includeFlightPaths: false,
     includeBatteryData: true
@@ -124,7 +124,7 @@ export default function ReportGenerator() {
         .lte('start_time', formData.dateTo + 'T23:59:59')
         .order('start_time', { ascending: false })
 
-      if (formData.aircraftId) {
+      if (formData.aircraftId && formData.aircraftId !== 'all') {
         query = query.eq('aircraft_id', formData.aircraftId)
       }
 
@@ -281,7 +281,7 @@ export default function ReportGenerator() {
                 <SelectValue placeholder="All aircraft" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="">All aircraft</SelectItem>
+                <SelectItem value="all">All aircraft</SelectItem>
                 {aircraft.map((aircraft) => (
                   <SelectItem key={aircraft.id} value={aircraft.id}>
                     {aircraft.manufacturer} {aircraft.model} ({aircraft.registration_number})

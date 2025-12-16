@@ -19,7 +19,7 @@ import { Checkbox } from '@/components/ui/checkbox'
 export default function FlightForm({ flight = null, onSuccess, onCancel }) {
   const [formData, setFormData] = useState({
     aircraft_id: flight?.aircraft_id || '',
-    battery_id: flight?.battery_id || '',
+    battery_id: flight?.battery_id || 'none',
     flight_number: flight?.flight_number || '',
     start_time: flight?.start_time?.split('T')[0] || '',
     start_time_time: flight?.start_time?.split('T')[1]?.substring(0, 5) || '',
@@ -127,7 +127,7 @@ export default function FlightForm({ flight = null, onSuccess, onCancel }) {
       const submitData = {
         aircraft_id: formData.aircraft_id,
         pilot_id: user.id,
-        battery_id: formData.battery_id || null,
+        battery_id: formData.battery_id === 'none' ? null : formData.battery_id,
         flight_number: formData.flight_number || null,
         start_time: startDateTime.toISOString(),
         end_time: endDateTime?.toISOString() || null,
@@ -217,7 +217,7 @@ export default function FlightForm({ flight = null, onSuccess, onCancel }) {
                   <SelectValue placeholder="Select battery" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">No battery selected</SelectItem>
+                  <SelectItem value="none">No battery selected</SelectItem>
                   {batteries.map((battery) => (
                     <SelectItem key={battery.id} value={battery.id}>
                       {battery.serial_number} ({battery.manufacturer})

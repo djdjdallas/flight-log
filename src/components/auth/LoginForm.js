@@ -20,18 +20,36 @@ export default function LoginForm() {
     setLoading(true)
     setError('')
 
+    console.log('Starting login process...')
+
     const { data, error } = await supabase.auth.signInWithPassword({
       email,
       password,
     })
 
+    console.log('Login response:', { data, error })
+
     if (error) {
+      console.error('Login error:', error)
       setError(error.message)
       setLoading(false)
       return
     }
 
-    router.push('/dashboard')
+    if (!data.user) {
+      console.error('No user data received')
+      setError('Login failed - no user data')
+      setLoading(false)
+      return
+    }
+
+    console.log('Login successful, setting up redirect...')
+
+    // Set loading to false first
+    setLoading(false)
+
+    // Use a full page reload to ensure session is properly established
+    window.location.replace('/dashboard')
   }
 
   return (

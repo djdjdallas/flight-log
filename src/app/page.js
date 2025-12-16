@@ -1,5 +1,6 @@
 "use client";
 import React, { useState } from "react";
+import { useRouter } from "next/navigation";
 import {
   Plane,
   Shield,
@@ -22,6 +23,7 @@ import {
 
 export default function AeroNoteLanding() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const router = useRouter();
 
   return (
     <div className="min-h-screen bg-white">
@@ -66,10 +68,16 @@ export default function AeroNoteLanding() {
               >
                 Docs
               </a>
-              <button className="text-slate-600 hover:text-slate-900 font-medium">
+              <button 
+                onClick={() => router.push('/auth/login')}
+                className="text-slate-600 hover:text-slate-900 font-medium"
+              >
                 Sign In
               </button>
-              <button className="bg-sky-500 text-white px-4 py-2 rounded-lg hover:bg-sky-600 transition-colors font-medium">
+              <button 
+                onClick={() => router.push('/auth/signup')}
+                className="bg-sky-500 text-white px-4 py-2 rounded-lg hover:bg-sky-600 transition-colors font-medium"
+              >
                 Start Free Trial
               </button>
             </nav>
@@ -116,13 +124,16 @@ export default function AeroNoteLanding() {
               >
                 Docs
               </a>
-              <a
-                href="#"
-                className="block px-3 py-2 text-base font-medium text-slate-700 hover:bg-slate-50 rounded-md"
+              <button
+                onClick={() => router.push('/auth/login')}
+                className="block px-3 py-2 text-base font-medium text-slate-700 hover:bg-slate-50 rounded-md w-full text-left"
               >
                 Sign In
-              </a>
-              <button className="w-full mt-2 bg-sky-500 text-white px-4 py-2 rounded-lg hover:bg-sky-600 transition-colors font-medium">
+              </button>
+              <button 
+                onClick={() => router.push('/auth/signup')}
+                className="w-full mt-2 bg-sky-500 text-white px-4 py-2 rounded-lg hover:bg-sky-600 transition-colors font-medium"
+              >
                 Start Free Trial
               </button>
             </div>
@@ -155,7 +166,10 @@ export default function AeroNoteLanding() {
               </p>
 
               <div className="mt-10 flex flex-col sm:flex-row gap-4 justify-center">
-                <button className="bg-sky-500 text-white px-8 py-4 rounded-lg hover:bg-sky-600 transition-colors font-medium text-lg inline-flex items-center justify-center">
+                <button 
+                  onClick={() => router.push('/auth/signup')}
+                  className="bg-sky-500 text-white px-8 py-4 rounded-lg hover:bg-sky-600 transition-colors font-medium text-lg inline-flex items-center justify-center"
+                >
                   Start 14-Day Free Trial
                   <ArrowRight className="ml-2 h-5 w-5" />
                 </button>
@@ -346,7 +360,10 @@ export default function AeroNoteLanding() {
                     <span className="text-slate-600">Mobile app access</span>
                   </li>
                 </ul>
-                <button className="w-full bg-white text-slate-900 px-6 py-3 rounded-lg hover:bg-slate-50 transition-colors font-medium border border-slate-200">
+                <button 
+                  onClick={() => router.push('/auth/signup')}
+                  className="w-full bg-white text-slate-900 px-6 py-3 rounded-lg hover:bg-slate-50 transition-colors font-medium border border-slate-200"
+                >
                   Start Free Trial
                 </button>
               </div>
@@ -390,7 +407,10 @@ export default function AeroNoteLanding() {
                     <span className="text-slate-300">Priority support</span>
                   </li>
                 </ul>
-                <button className="w-full bg-sky-500 text-white px-6 py-3 rounded-lg hover:bg-sky-600 transition-colors font-medium">
+                <button 
+                  onClick={() => router.push('/auth/signup')}
+                  className="w-full bg-sky-500 text-white px-6 py-3 rounded-lg hover:bg-sky-600 transition-colors font-medium"
+                >
                   Start Free Trial
                 </button>
               </div>
@@ -449,7 +469,10 @@ export default function AeroNoteLanding() {
               week with AeroNote.
             </p>
             <div className="flex flex-col sm:flex-row gap-4 justify-center">
-              <button className="bg-white text-sky-600 px-8 py-4 rounded-lg hover:bg-sky-50 transition-colors font-medium text-lg inline-flex items-center justify-center">
+              <button 
+                onClick={() => router.push('/auth/signup')}
+                className="bg-white text-sky-600 px-8 py-4 rounded-lg hover:bg-sky-50 transition-colors font-medium text-lg inline-flex items-center justify-center"
+              >
                 Start Your Free Trial
                 <ArrowRight className="ml-2 h-5 w-5" />
               </button>

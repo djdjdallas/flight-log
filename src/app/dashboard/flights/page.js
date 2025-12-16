@@ -1,18 +1,21 @@
-import { redirect } from 'next/navigation'
-import { createServerComponentClient } from '@supabase/auth-helpers-nextjs'
-import { cookies } from 'next/headers'
+'use client'
+import { useState, useCallback } from 'react'
 import DashboardLayout from '@/components/layout/DashboardLayout'
 import FlightList from '@/components/flights/FlightList'
 import FlightFilters from '@/components/flights/FlightFilters'
 import AddFlightButton from '@/components/flights/AddFlightButton'
 
-export default async function FlightsPage() {
-  const supabase = createServerComponentClient({ cookies })
-  const { data: { session } } = await supabase.auth.getSession()
+export default function FlightsPage() {
+  const [filters, setFilters] = useState({})
+  const [refreshKey, setRefreshKey] = useState(0)
 
-  if (!session) {
-    redirect('/auth/login')
-  }
+  const handleFiltersChange = useCallback((newFilters) => {
+    setFilters(newFilters)
+  }, [])
+
+  const handleFlightAdded = useCallback(() => {
+    setRefreshKey(prev => prev + 1)
+  }, [])
 
   return (
     <DashboardLayout>
@@ -23,14 +26,14 @@ export default async function FlightsPage() {
             <h1 className="text-3xl font-bold text-gray-900">Flight Logs</h1>
             <p className="text-gray-600 mt-2">View and manage your flight history and compliance data</p>
           </div>
-          <AddFlightButton />
+          <AddFlightButton onFlightAdded={handleFlightAdded} />
         </div>
 
         {/* Filters */}
-        <FlightFilters />
+        <FlightFilters onFiltersChange={handleFiltersChange} />
 
         {/* Flight List */}
-        <FlightList />
+        <FlightList filters={filters} onFlightAdded={handleFlightAdded} key={refreshKey} />
       </div>
     </DashboardLayout>
   )

@@ -33,7 +33,12 @@ export default function ReportHistory() {
   async function fetchReports() {
     try {
       const { data: { user } } = await supabase.auth.getUser()
-      if (!user) return
+      if (!user) {
+        console.log('No user found')
+        return
+      }
+
+      console.log('Fetching reports for user:', user.id)
 
       const { data, error } = await supabase
         .from('compliance_reports')
@@ -41,8 +46,11 @@ export default function ReportHistory() {
         .eq('user_id', user.id)
         .order('generated_at', { ascending: false })
 
+      console.log('Reports query result:', { data, error })
+
       if (error) throw error
       setReports(data || [])
+      console.log('Reports set:', data || [])
     } catch (err) {
       console.error('Error fetching reports:', err)
       setError(err.message)
