@@ -63,6 +63,19 @@ export default function SignupForm() {
 
       if (authError) throw authError
 
+      // Send welcome email (fire and forget - don't block signup)
+      if (authData.user) {
+        fetch('/api/auth/welcome', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            userId: authData.user.id,
+            email: formData.email,
+            name: formData.fullName
+          })
+        }).catch(console.error)
+      }
+
       if (authData.user && !authData.session) {
         setMessage('Please check your email for verification link before signing in.')
       } else {

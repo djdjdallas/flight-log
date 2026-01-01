@@ -2,11 +2,12 @@
 import { useState } from 'react'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { User, Bell, Shield, Download, Key } from 'lucide-react'
+import { User, Bell, Shield, Download, Key, CreditCard } from 'lucide-react'
 import ProfileSettings from './ProfileSettings'
 import NotificationPreferences from './NotificationPreferences'
 import AccountSettings from './AccountSettings'
 import DataPrivacy from './DataPrivacy'
+import BillingSettings from './BillingSettings'
 
 export default function SettingsTabs() {
   const [activeTab, setActiveTab] = useState('profile')
@@ -17,6 +18,12 @@ export default function SettingsTabs() {
       label: 'Profile',
       icon: User,
       description: 'Update your personal information and pilot credentials'
+    },
+    {
+      id: 'billing',
+      label: 'Billing',
+      icon: CreditCard,
+      description: 'Manage your subscription and payment methods'
     },
     {
       id: 'notifications',
@@ -40,7 +47,7 @@ export default function SettingsTabs() {
 
   return (
     <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-      <TabsList className="grid w-full grid-cols-4">
+      <TabsList className="grid w-full grid-cols-5">
         {tabs.map((tab) => {
           const Icon = tab.icon
           return (
@@ -64,6 +71,7 @@ export default function SettingsTabs() {
             </CardHeader>
             <CardContent>
               {tab.id === 'profile' && <ProfileSettings />}
+              {tab.id === 'billing' && <BillingSettings />}
               {tab.id === 'notifications' && <NotificationPreferences />}
               {tab.id === 'account' && <AccountSettings />}
               {tab.id === 'privacy' && <DataPrivacy />}
